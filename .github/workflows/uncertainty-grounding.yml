@@ -1,8 +1,18 @@
 name: Uncertainty and grounding experiments
 on:
   push:
+    paths-ignore:
+      - '.github/README.md'
+      - '.github/CI.md'
+      - 'CURRENT_REPRODUCTION.md'
+      - 'graph_synthesis/DATASETS.md'
     branches: [main, research/uncertainty-grounding-20260918]
   pull_request:
+    paths-ignore:
+      - '.github/README.md'
+      - '.github/CI.md'
+      - 'CURRENT_REPRODUCTION.md'
+      - 'graph_synthesis/DATASETS.md'
 permissions:
   contents: read
 concurrency:
@@ -134,14 +144,8 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - name: Classify changed research inputs
-        id: scope
-        uses: ./.github/actions/research-scope
-        continue-on-error: true
       - run: python -m pip install -r reproduction/requirements-jev.txt -r graph_synthesis/uncertainty/requirements.txt
-        if: steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false'
       - name: Replay all results and verify source, protocol, archive and PDF provenance
-        if: steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false'
         run: |
           python -B -m unittest discover -s graph_synthesis/uncertainty/tests -v
           python -B -m graph_synthesis.uncertainty.run --check
@@ -179,14 +183,8 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
-      - name: Classify changed research inputs
-        id: scope
-        uses: ./.github/actions/research-scope
-        continue-on-error: true
       - run: python -m pip install -r graph_synthesis/requirements-figures.txt -r graph_synthesis/uncertainty/requirements.txt
-        if: steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false'
       - name: Regenerate charts and manuscript without artifact drift
-        if: steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false'
         run: |
           python -B -m graph_synthesis.uncertainty.report --figures --update-paper
           git diff --exit-code -- graph_synthesis/uncertainty manuscript/paper-current.md CURRENT_RESULTS.md

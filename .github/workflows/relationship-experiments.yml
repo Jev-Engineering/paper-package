@@ -1,7 +1,17 @@
 name: Relationship experiments
 on:
   pull_request:
+    paths-ignore:
+      - '.github/README.md'
+      - '.github/CI.md'
+      - 'CURRENT_REPRODUCTION.md'
+      - 'graph_synthesis/DATASETS.md'
   push:
+    paths-ignore:
+      - '.github/README.md'
+      - '.github/CI.md'
+      - 'CURRENT_REPRODUCTION.md'
+      - 'graph_synthesis/DATASETS.md'
     branches: [main]
 permissions:
   contents: read
@@ -31,24 +41,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Classify changed research inputs
-        id: scope
-        uses: ./.github/actions/research-scope
-        continue-on-error: true
       - name: Preserve reviewed source
-        if: steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false'
         run: git archive --format=tar HEAD -o "$RUNNER_TEMP/relationship-source.tar"
       - name: Install numerical replay dependency
-        if: steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false'
         run: python -m pip install -r reproduction/requirements-jev.txt
       - name: Run original and new graph tests
-        if: steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false'
         run: python -B -m unittest discover -s graph_synthesis/tests -v 2>&1 | tee "$RUNNER_TEMP/relationship-tests.log"
       - name: Reproduce and compare committed experiment reference
-        if: steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false'
         run: python -B experiments/relationships/reproduce.py --output "$RUNNER_TEMP/relationship-results"
       - name: Archive exact source, full journals, comparisons, and verification
-        if: (steps.scope.outcome != 'success' || steps.scope.outputs.run_research != 'false') && (always())
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: relationships-${{ matrix.os }}-${{ github.event.pull_request.head.sha || github.sha }}

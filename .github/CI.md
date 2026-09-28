@@ -1,56 +1,45 @@
 # Research CI routing and dependency map
 
-The repository has 21 workflows: 18 broadly triggered research workflows and
-three workflows that already have path filters. This change keeps every original
-job, platform matrix, command, artifact upload, permission, and research-branch
-publication condition. The 18 broad workflows use the shared
-[scope action](actions/research-scope/action.yml) after checkout and Python setup to avoid expensive
-research steps when only these standalone documentation files change:
+The repository has 21 research workflows: 18 broadly triggered workflows and
+three workflows that already have path filters. The 18 broad workflows now use
+`paths-ignore` on both pull requests and pushes for exactly four standalone docs:
 
 - `.github/README.md`
 - `.github/CI.md`
 - `CURRENT_REPRODUCTION.md`
 - `graph_synthesis/DATASETS.md`
 
-Every other path retains normal verification. In particular, **root `README.md`
-and `REPRODUCE.md`, protocols, current results, and manuscript Markdown are research
-inputs**. They must not be excluded by an extension such as `**/*.md`.
+A change confined to those files runs one lightweight
+[documentation workflow](workflows/documentation.yml), which checks their local
+link destinations without network access or third-party Python dependencies.
+That workflow also runs when its own implementation changes. Research jobs,
+platform matrices, commands, artifact uploads, permissions, and research-branch
+publication conditions are retained unchanged for relevant changes.
 
-## Check names, failures, and comparison semantics
+Every other path retains normal research verification. **Root `README.md` and
+`REPRODUCE.md`, protocols, current results, and manuscript Markdown are research
+inputs**. They must not be excluded using a broad glob such as `**/*.md`.
+Mixed documentation/source changes and edits to any workflow run the research
+workflows. No custom classifier, extra scope jobs, deep fetch, or API call is
+needed: GitHub evaluates these exact path filters before assigning runners.
 
-The existing jobs still start and report their original names, including each
-Windows/Linux matrix context. On an allowlisted documentation change they perform
-checkout, pinned Python setup, and classification; the two graph verification jobs also run the routing
-regressions. Package installation, dataset download, scientific replay,
-rendering, and artifact steps are skipped. This saves execution time while keeping
-required checks satisfiable. It does not reduce the number of runner starts.
-
-A workflow-level path filter can leave required checks pending. A job-level
-condition runs before matrix expansion and can omit the platform-specific check
-names. A replacement shared gate would change the set of check identities.
-The local composite action retains the existing job identities without adding a
-classification job to every workflow. See GitHub's
-[workflow and matrix condition rules](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idif).
-
-The [classifier](ci_scope.py) compares the PR head with its merge base using a
-three-dot diff. Push events use the exact before/after trees with a two-dot diff.
-Rename detection is disabled so a code file renamed into an allowlisted path
-still includes its deleted source path. Deletions are included. The diff is not
-limited to the first 300 files.
-
-Existing checkout depths are retained. If comparison objects or ancestry are
-missing from a shallow checkout, the classifier makes one bounded fetch from
-`origin`: the two explicit commit refs, no tags, no blobs, depth 64 for PRs or
-depth 1 for pushes, and a 45-second timeout. It logs the fetch depth and elapsed
-seconds. Failure to fetch, insufficient ancestry, invalid event data, empty
-diffs, new/deleted branches, and manual runs all retain normal verification.
-If the action fails or its output is missing, the subsequent steps also run
-normally. Existing `always()` failure-artifact conditions are preserved.
+## Required checks and filter boundaries
 
 The main branch had no required-check protection or rulesets when reviewed on
-2026-09-28. No protection is changed here. The three existing path-filtered
-workflows below retain their original behavior; they should not be made required
-for every PR without first providing an always-present check.
+2026-09-28. No protection or existing check name is changed here. A workflow
+excluded by a native path filter does not report its usual check contexts.
+Before introducing required checks, maintainers must account for these filters:
+requiring a conditional research job for every PR can leave a docs-only PR
+pending. Either require checks only for their applicable changes or introduce an
+always-present gate that validates the intended routing and results. The same
+consideration already applies to the three previously scoped research workflows.
+See GitHub's [path-filter documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore).
+
+GitHub uses a three-dot diff for pull requests and a two-dot diff for existing
+branch pushes. Because the ignore set contains only four literal file paths,
+this change cannot hide a research input behind a broad Markdown or directory
+pattern. New workflow files and all shared code/evidence still trigger the broad
+workflows. A manual run retains the workflow's existing full behavior.
 
 ## Dependency matrix
 
@@ -81,7 +70,7 @@ and invoke other studies; changing one study can affect another study's checks.
 | [New mechanisms](workflows/novel-mechanisms.yml): `replay` on Windows/Linux, `figures-and-paper` | `novel_mechanisms/**`, preceding-study regressions, publication/regret analyses, original inventory and cumulative manuscript | Broad |
 | [Uncertainty](workflows/uncertainty-grounding.yml): `replay` on Windows/Linux, `figures-and-paper` | `uncertainty/**`, preceding-study preservation, original inventory and cumulative manuscript | Broad |
 | [Dependence certificates](workflows/dependence-certificates.yml): `replay` | `certificates/**`, fixed protocol ancestry, numerical replay, original inventory and cumulative manuscript | Broad |
-| [Corpus methodology](workflows/corpus-methodology.yml): Windows/Linux × Python 3.12/3.13 `offline-planning-tests` | `graph_synthesis/corpus/**`, `LARGE_CORPUS_METHODOLOGY.md`, own workflow; offline planning without model calls | Existing path filter |
+| [Corpus methodology](workflows/corpus-methodology.yml): Windows/Linux Ã— Python 3.12/3.13 `offline-planning-tests` | `graph_synthesis/corpus/**`, `LARGE_CORPUS_METHODOLOGY.md`, own workflow; offline planning without model calls | Existing path filter |
 | [DSPy optimizer](workflows/dspy-jev-optimizer.yml): Windows/Linux `offline`, `sdk-contracts` | `dspy_jev_optimizer/**`, own workflow; optimizer artifact/inventory checks, synthetic wiring, real SDKs with mocked inference | Existing path filter |
 | [Post-certificate research](workflows/post-certificates.yml): `verify` | `post_certificates/**`, `CURRENT_RESULTS.md`, `manuscript/paper-current.*`, own workflow; protocol ancestry, numerical evidence, report/figure stability | Existing path filter |
 
@@ -98,21 +87,29 @@ changed only `.github/README.md` at commit
 The separate sum of workflow elapsed times was 1,435 seconds; it is not a runner
 cost measurement because jobs within each workflow can overlap.
 
-The new policy keeps those 44 status-producing jobs and routes all 44 away from
-research execution for that exact diff. The comparison includes hosted checkout
-and bounded-fetch overhead; execution time must be measured on the hosted
-documentation probe, not inferred from the skipped commands.
+For that same changed-file set, the native filters select only the documentation
+workflow: **44 research jobs become one documentation-link job**. Source,
+requirements, dataset acquisition, manifest, stored evidence, rendering, and
+workflow changes retain all 44 original broad-workflow jobs, plus any applicable
+previously scoped workflow. A change to this routing implementation runs the full
+research collection and the documentation check.
+
+Validate routing against both event blocks and the complete workflow definitions;
+verify that only the four literal standalone paths are ignored and that every
+original job definition is unchanged. Validate examples for a single standalone
+doc, several standalone docs, a mixed doc/code change, root archival Markdown,
+current manuscripts, shared code, requirements, datasets, and workflow edits.
+Measure the hosted documentation-only probe before claiming runtime savings.
 
 Local validation commands:
 
 ```sh
-python -B -m unittest discover -s .github -p test_ci_scope.py -v
+python -B -m unittest discover -s .github -p test_documentation.py -v
+python -B .github/check_documentation.py
 actionlint -shellcheck= -pyflakes=
 python -B -m graph_synthesis.verify
 ```
 
-Routing tests use real Git repositories, including depth-one clones. They cover
-PR and push comparisons, target-branch-only changes, renamed and deleted files,
-frozen evidence and unknown paths, missing refs, insufficient fetch depth,
-unavailable remotes, timeout, and missing event data. Routing tests run in both
-graph-verification platform jobs even when the research steps are skipped.
+The documentation checker validates local file/directory destinations in ordinary
+Markdown links. It ignores external URLs, fragment-only links, and fenced examples;
+it does not crawl remote websites or claim to validate generated heading anchors.
