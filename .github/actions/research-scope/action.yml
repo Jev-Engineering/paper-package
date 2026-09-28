@@ -1,0 +1,12 @@
+name: Classify research inputs
+description: Retain research verification unless only known standalone documentation changed.
+outputs:
+  run_research:
+    description: Only the explicit false value permits skipping expensive research steps.
+    value: ${{ steps.classify.outputs.run_research }}
+runs:
+  using: composite
+  steps:
+    - id: classify
+      shell: bash
+      run: python -B .github/ci_scope.py
